@@ -1,0 +1,34 @@
+# 1. Iniciar demonio
+.\ejercicio4.ps1 `
+  -directorio ".\pruebas\monitoreado" `
+  -palabras "password", "account", "unlam" `
+  -log ".\pruebas\logs\ejercicio4.log"
+
+# 2. Crear archivo con palabra clave
+
+"este archivo contiene una password" | Out-File ".\pruebas\monitoreado\test1.txt"
+
+# 3. Modificar archivo agregando otra palabra clave
+
+"ahora agrego UNLAM al archivo" | Add-Content ".\pruebas\monitoreado\test1.txt"
+
+# 4. Ver log
+
+Get-Content ".\pruebas\logs\ejercicio4.log"
+
+# 5. Intentar iniciar otro demonio para el mismo directorio
+.\ejercicio4.ps1 `
+  -directorio ".\pruebas\monitoreado" `
+  -palabras "password", "account", "unlam" `
+  -log ".\pruebas\logs\ejercicio4.log"
+
+# 6. Probar monitoreo de subcarpetas
+New-Item -ItemType Directory -Path ".\pruebas\monitoreado\subcarpeta" -Force
+
+"archivo dentro de subcarpeta con password" | Out-File ".\pruebas\monitoreado\subcarpeta\test_sub.txt"
+
+
+Get-Content ".\pruebas\logs\ejercicio4.log"
+
+# 7. Detener demonio
+.\ejercicio4.ps1 -directorio ".\pruebas\monitoreado" -kill
