@@ -1,0 +1,5 @@
+Hola, este es un texto " super " desordenado.
+¿Como estas? Yo estoy bien...
+¡Que desastre! Y Yo que pensaba que funcionaba.
+Aqui hay espacios antes de los dos puntos: y despues de la coma, pero le falta el final.
+Yo dije " hola "... ¿Funcionara?
