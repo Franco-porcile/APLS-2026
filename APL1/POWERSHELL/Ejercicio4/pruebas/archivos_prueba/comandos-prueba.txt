@@ -1,34 +1,35 @@
-# 1. Iniciar demonio
-.\ejercicio4.ps1 `
-  -directorio ".\pruebas\monitoreado" `
-  -palabras "password", "account", "unlam" `
-  -log ".\pruebas\logs\ejercicio4.log"
+# 1. Dar permiso de ejecución al script
+chmod +x ./ejercicio4.ps1
 
-# 2. Crear archivo con palabra clave
+# 2. Iniciar demonio
+./ejercicio4.ps1 \
+  -directorio "./pruebas/monitoreado" \
+  -palabras "password" "account" "unlam" \
+  -log "./pruebas/logs/ejercicio4.log"
 
-"este archivo contiene una password" | Out-File ".\pruebas\monitoreado\test1.txt"
+# 3. Crear archivo con palabra clave
+echo "este archivo contiene una password" > ./pruebas/monitoreado/test1.txt
 
-# 3. Modificar archivo agregando otra palabra clave
+# 4. Modificar archivo agregando otra palabra clave
+echo "ahora agrego UNLAM al archivo" >> ./pruebas/monitoreado/test1.txt
 
-"ahora agrego UNLAM al archivo" | Add-Content ".\pruebas\monitoreado\test1.txt"
+# 5. Ver log
+cat ./pruebas/logs/ejercicio4.log
 
-# 4. Ver log
+# 6. Intentar iniciar otro demonio para el mismo directorio
+./ejercicio4.ps1 \
+  -directorio "./pruebas/monitoreado" \
+  -palabras "password" "account" "unlam" \
+  -log "./pruebas/logs/ejercicio4.log"
 
-Get-Content ".\pruebas\logs\ejercicio4.log"
+# 7. Probar monitoreo de subcarpetas
+mkdir -p ./pruebas/monitoreado/subcarpeta
 
-# 5. Intentar iniciar otro demonio para el mismo directorio
-.\ejercicio4.ps1 `
-  -directorio ".\pruebas\monitoreado" `
-  -palabras "password", "account", "unlam" `
-  -log ".\pruebas\logs\ejercicio4.log"
+echo "archivo dentro de subcarpeta con password" > ./pruebas/monitoreado/subcarpeta/test_sub.txt
 
-# 6. Probar monitoreo de subcarpetas
-New-Item -ItemType Directory -Path ".\pruebas\monitoreado\subcarpeta" -Force
+# 8. Esperar y ver log
 
-"archivo dentro de subcarpeta con password" | Out-File ".\pruebas\monitoreado\subcarpeta\test_sub.txt"
+cat ./pruebas/logs/ejercicio4.log
 
-
-Get-Content ".\pruebas\logs\ejercicio4.log"
-
-# 7. Detener demonio
-.\ejercicio4.ps1 -directorio ".\pruebas\monitoreado" -kill
+# 9. Detener demonio
+./ejercicio4.ps1 -directorio "./pruebas/monitoreado" -kill

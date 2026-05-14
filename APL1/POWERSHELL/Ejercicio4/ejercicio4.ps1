@@ -1,3 +1,5 @@
+#!/usr/bin/env pwsh
+
 # Integrantes :
 # - Nombre Apellido: Porcile Franco
 # - Nombre Apellido: Graneros Brian Ariel
@@ -28,8 +30,8 @@
 
 .PARAMETER palabras
     Lista de palabras clave a buscar dentro de los archivos.
-    Debe recibirse como array nativo de PowerShell.
-    Ejemplo: -palabras "password", "account", "unlam"
+    Ejemplo:
+    ./ejercicio4.ps1 -directorio "./descargas" -palabras "password" "account" "unlam" -log "./log.txt"
 
 .PARAMETER log
     Archivo donde se registrarán las detecciones realizadas por el demonio.
@@ -41,28 +43,14 @@
 .EXAMPLE
     Get-Help ./ejercicio4.ps1
 
-    Muestra la ayuda del script.
+.EXAMPLE
+    ./ejercicio4.ps1 -directorio "../descargas" -palabras "password" "account" "unlam" -log "log.txt"
 
 .EXAMPLE
-    ./ejercicio4.ps1 -directorio "../descargas" -palabras "password", "account", "unlam" -log "log.txt"
-
-    Inicia un demonio en segundo plano que monitorea el directorio ../descargas y sus subdirectorios.
-
-.EXAMPLE
-    ./ejercicio4.ps1 -directorio "../documentos" -palabras "virtualizacion", "cloud", "storage" -log "../registro.txt"
-
-    Inicia un demonio en segundo plano que monitorea el directorio ../documentos y sus subdirectorios.
+    ./ejercicio4.ps1 -directorio "../documentos" -palabras "virtualizacion" "cloud" "storage" -log "../registro.txt"
 
 .EXAMPLE
     ./ejercicio4.ps1 -directorio "../descargas" -kill
-
-    Finaliza el demonio que estaba monitoreando el directorio ../descargas.
-
-.NOTES
-    - El archivo de control del demonio se guarda en el directorio temporal del sistema.
-    - Si el demonio ya se encuentra ejecutando para un directorio, no se inicia otro.
-    - Si ocurre un error al leer un archivo puntual, se registra el error y el demonio continúa.
-    - El monitoreo incluye subdirectorios.
 #>
 
 [CmdletBinding(DefaultParameterSetName="Iniciar")]
@@ -124,8 +112,20 @@ Param(
         ParameterSetName="Iniciar",
         DontShow=$true
     )]
-    [switch]$demonioInterno
+    [switch]$demonioInterno,
+
+    [Parameter(
+        Mandatory=$false,
+        ParameterSetName="Iniciar",
+        ValueFromRemainingArguments=$true,
+        DontShow=$true
+    )]
+    [string[]]$palabrasRestantes
 )
+
+if ($palabrasRestantes -and $palabrasRestantes.Count -gt 0) {
+    $palabras += $palabrasRestantes
+}
 
 function Get-RutaAbsoluta {
     param([string]$Path)
@@ -292,10 +292,7 @@ function Start-Demonio {
     $sourceChanged = "Ejercicio4.Changed.$PID"
     $sourceRenamed = "Ejercicio4.Renamed.$PID"
 
-    # Evita registrar eventos duplicados muy cercanos entre si.
     $eventosProcesados = @{}
-
-    # Evita registrar Changed inmediatamente despues de Created para el mismo archivo.
     $archivosCreadosRecientemente = @{}
 
     try {
@@ -308,7 +305,6 @@ function Start-Demonio {
 
         Write-LogMensaje -ArchivoLog $archivoLogResuelto -Mensaje "Demonio iniciado para el directorio '$directorioResuelto'."
 
-        # Primero procesa los archivos ya existentes en el directorio y subdirectorios.
         Get-ChildItem -Path $directorioResuelto -File -Recurse -ErrorAction Stop | ForEach-Object {
             Procesar-Archivo `
                 -Path $_.FullName `
@@ -346,14 +342,11 @@ function Start-Demonio {
                 $tipo = $evento.SourceEventArgs.ChangeType.ToString()
                 $ahora = Get-Date
 
-                # Si se crea un directorio, no se procesa como archivo.
                 if (Test-Path $path -PathType Container) {
                     Remove-Event -EventIdentifier $evento.EventIdentifier -ErrorAction SilentlyContinue
                     continue
                 }
 
-                # Si el archivo se acaba de crear, se recuerda para ignorar el Changed inmediato
-                # que Windows suele disparar como parte de la misma operacion de escritura.
                 if ($tipo -eq "Created") {
                     $archivosCreadosRecientemente[$path] = $ahora
                 }
@@ -371,8 +364,6 @@ function Start-Demonio {
                     $item = Get-Item -Path $path -ErrorAction SilentlyContinue
 
                     if ($null -ne $item) {
-                        # No incluye el tipo de evento para evitar duplicados Created + Changed
-                        # cuando representan la misma operacion logica.
                         $claveEvento = "$($item.FullName)|$($item.Length)|$($item.LastWriteTimeUtc.Ticks)"
 
                         if ($eventosProcesados.ContainsKey($claveEvento)) {
@@ -429,24 +420,32 @@ function Iniciar-ProcesoDemonio {
     $archivoLogResuelto = Get-RutaAbsoluta -Path $ArchivoLog
     $script = $PSCommandPath
 
-    $ejecutablePowerShell = "powershell.exe"
+    $ejecutablePowerShell = (Get-Process -Id $PID).Path
 
-    $palabrasArgumento = ($Palabras | ForEach-Object {
-        "'" + ($_ -replace "'", "''") + "'"
-    }) -join ","
-
-    $comando = "& '$script' -directorio '$directorioResuelto' -palabras $palabrasArgumento -log '$archivoLogResuelto' -demonioInterno"
+    if ([string]::IsNullOrWhiteSpace($ejecutablePowerShell)) {
+        $ejecutablePowerShell = "pwsh"
+    }
 
     $argumentos = @(
         "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
-        "-Command", $comando
+        "-File",
+        $script,
+        "-directorio",
+        $directorioResuelto,
+        "-palabras"
+    )
+
+    $argumentos += $Palabras
+
+    $argumentos += @(
+        "-log",
+        $archivoLogResuelto,
+        "-demonioInterno"
     )
 
     $proceso = Start-Process `
         -FilePath $ejecutablePowerShell `
         -ArgumentList $argumentos `
-        -WindowStyle Hidden `
         -PassThru
 
     $estado = [PSCustomObject]@{
@@ -496,8 +495,6 @@ function Detener-Demonio {
         exit 1
     }
 }
-
-##### MAIN
 
 try {
     $directorioResuelto = (Resolve-Path $directorio).Path
